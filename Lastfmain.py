@@ -49,8 +49,7 @@ class lastfm:
 
 		response_data = self.send_request(args)
 
-		with io.open('ArtistList.json', 'w', encoding='utf-8') as f:
-  			f.write(unicode(json.dumps(response_data, ensure_ascii=False)))
+		return response_data
 
   	def getTopTracksFromArtist(self,artist):
   		args = {
@@ -61,8 +60,12 @@ class lastfm:
 
   		response_data = self.send_request(args)
 
-		with io.open(str(artist) + ".json", 'w', encoding='utf-8') as f:
-  			f.write(unicode(json.dumps(response_data, ensure_ascii=False)))
+  		ruta = './lastJSON'
+  		if not os.path.exists(ruta):
+  			os.makedirs(ruta)
+
+		with io.open(ruta + "/" + str(artist) + "TAGS" + ".json", 'w', encoding='utf-8') as f:
+  			f.write(unicode(json.dumps(resp_d, ensure_ascii=False)))
 
   	def getTopTags(self, artist):
   		args = {
@@ -79,31 +82,34 @@ class lastfm:
   				tag["name"] = tag["name"].replace('-','').replace(' ','').upper()
 
 
-		with io.open(str(artist) + "TAGS" + ".json", 'w', encoding='utf-8') as f:
+		ruta = './lastJSON'
+  		if not os.path.exists(ruta):
+  			os.makedirs(ruta)
+
+		with io.open(ruta + "/" + str(artist) + "TAGS" + ".json", 'w', encoding='utf-8') as f:
   			f.write(unicode(json.dumps(resp_d, ensure_ascii=False)))
 
 
 class mongoforlast:
 	def __init__(self):
-		self.PATH = "D:/MongoDB/Server/3.0/bin/lastJSON/"
+		self.PATH = "./lastJSON/"
 		self.USER = "Poobowl"
-	
-	def insertarBD(path = self.PATH, user = self.USER):
-		#configurar la conexion
+
+	def insertarBD(self):
 		cliente = MongoClient()
-		db=cliente.proyecto
-		dir= os.listdir(path)
+		db = cliente.proyecto
+		dir = os.listdir(self.PATH)
 		dir.pop
-		for x in (dir):
-			print(x)
-			f = open(path+x, 'r')
-			res=db[user].insert_one(eval(f.read()))
+		for archivo in (dir):
+			print (archivo)
+			f = open(self.PATH + archivo, 'r')
+			res = db[self.USER].insert_one(eval(f.read()))
 			print(res.inserted_id)
 
-	def Transformador(self, user):
+	def transformador(self):
 		cliente = MongoClient()
-		db=cliente.proyecto
-		cursor = db[user].find({"toptags.tag":{"$exists" : True}})
+		db = cliente.proyecto
+		cursor = db[self.USER].find({"toptags.tag":{"$exists" : True}})
 		numGeneros=[]
 		for document in cursor:
 			for genre in document["toptags"]["tag"]:
@@ -111,10 +117,10 @@ class mongoforlast:
 		numGeneros = list(set(numGeneros))
 		listGeneros=[]
 		for x in numGeneros:
-			artistas = db[user].find({"toptags.tag.name":x})
+			artistas = db[self.USER].find({"toptags.tag.name":x})
 			listArtistas=[]
 			for y in artistas:
-				canciones = db[user].find({"toptracks.@attr.artist":y["toptags"]["@attr"]["artist"]})
+				canciones = db[self.USER].find({"toptracks.@attr.artist":y["toptags"]["@attr"]["artist"]})
 				listCanciones=[]
 				for z in canciones[0]["toptracks"]["track"]:
 					cancion={"name":z["name"],"group":4}
@@ -123,35 +129,41 @@ class mongoforlast:
 				listArtistas.append(artista)
 			genero=({"children":listArtistas,"name":x,"group":2})
 			listGeneros.append(genero)
-		res={"children":listGeneros,"name":user,"group":1}
+		res={"children":listGeneros,"name":self.USER,"group":1}
 		print(res)
 		print(json.dumps(res))
-		f=open("final.json","w")
+		f=open("./static/arbol.json","w")
 		f.write(json.dumps(res))
-	
+
+
 
 
 @app.route("/")
-def indexview():
-	last_request = lastfm()
-	mongo_request = mongoforlast()
-
-	with io.open("ArtistList.json", 'r', encoding='utf-8') as data_file:
-		data = json.load(data_file)
-
-	data_file.close()
-	
-	for artist in data["topartists"]["artist"]:
-		last_request.getTopTags(str(artist["name"]))
-
-	mongo_request.insertarBD("D:/MongoDB/Server/3.0/bin/LASTFMULTIMATE/", "Poobowl")
-	mongo_request.Transformador("Poobowl")
+def view_index():
 
 	return render_template('index.html')
 
 
+@app.route("/lastfmtomongotod3")
+def main_work():
+	last_request = lastfm()
+	mongo_request = mongoforlast()
+
+	data = last_request.getArtistFromUser()
+
+	for artist in data["topartists"]["artist"]:
+		last_request.getTopTracksFromArtist(str(artist["name"]))
+		last_request.getTopTags(str(artist["name"]))
+
+
+	mongo_request.insertarBD()	
+	mongo_request.transformador()
+
+	return render_template('index.html')
+
 	
-if __name__ == "__main__":
-    app.run(host='0.0.0.0',port=5000,debug=True)
+if __name__ == '__main__':
+	app.run(host='0.0.0.0',port=5000,debug=True)
+	
 
 

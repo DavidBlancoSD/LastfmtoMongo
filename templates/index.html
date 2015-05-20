@@ -51,7 +51,7 @@ var svg = d3.select("body").append("svg")
   .append("g")
     .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
 
-d3.json("{{ url_for('static',filename='final.json') }}", function(error, Poobowl) {
+d3.json("{{ url_for('static',filename='arbol.json') }}", function(error, Poobowl) {
   root = Poobowl;
   root.x0 = height / 2;
   root.y0 = 0;
